@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, MapPin, CheckCircle, AlertCircle } from 'lucide-react';
+import { FileText, MapPin, CheckCircle, AlertCircle, Info, Shield } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,12 +13,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import Layout from '@/components/layout/Layout';
 import MapView from '@/components/map/MapView';
 import { useCreateIncident } from '@/hooks/useIncidents';
 import { useAuth } from '@/context/AuthContext';
 import { INCIDENT_CATEGORIES, IncidentCategory, CHICAGO_CENTER } from '@/types';
+import { cn } from '@/lib/utils';
+
+type SeverityLevel = 'low' | 'medium' | 'high';
 
 const Report: React.FC = () => {
   const navigate = useNavigate();
@@ -32,9 +36,11 @@ const Report: React.FC = () => {
     location: '',
     latitude: CHICAGO_CENTER.lat,
     longitude: CHICAGO_CENTER.lng,
+    severity: 'medium' as SeverityLevel,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState(false);
+  const [countdown, setCountdown] = useState(3);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -53,6 +59,10 @@ const Report: React.FC = () => {
     }
   };
 
+  const handleSeverityChange = (severity: SeverityLevel) => {
+    setFormData(prev => ({ ...prev, severity }));
+  };
+
   const handleMapClick = (lat: number, lng: number) => {
     setFormData(prev => ({
       ...prev,
@@ -66,10 +76,16 @@ const Report: React.FC = () => {
 
     if (!formData.title.trim()) {
       newErrors.title = 'Title is required';
+    } else if (formData.title.length > 100) {
+      newErrors.title = 'Title must be 100 characters or less';
     }
+
     if (!formData.description.trim()) {
       newErrors.description = 'Description is required';
+    } else if (formData.description.length > 500) {
+      newErrors.description = 'Description must be 500 characters or less';
     }
+
     if (!formData.category) {
       newErrors.category = 'Category is required';
     }
@@ -94,14 +110,33 @@ const Report: React.FC = () => {
         location: formData.location,
         latitude: formData.latitude,
         longitude: formData.longitude,
+        severity: formData.severity,
       });
 
       setSuccess(true);
-      setTimeout(() => {
-        navigate('/map');
-      }, 2000);
+
+      // Countdown timer
+      const interval = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            navigate('/map');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
     } catch (error) {
       setErrors({ submit: 'Failed to submit report. Please try again.' });
+    }
+  };
+
+  const getSeverityColor = (severity: SeverityLevel) => {
+    switch (severity) {
+      case 'low': return 'bg-green-100 text-green-700 border-green-200';
+      case 'medium': return 'bg-orange-100 text-orange-700 border-orange-200';
+      case 'high': return 'bg-red-100 text-red-700 border-red-200';
     }
   };
 
@@ -109,13 +144,40 @@ const Report: React.FC = () => {
     return (
       <Layout>
         <div className="container flex min-h-[60vh] items-center justify-center py-8">
-          <Card className="w-full max-w-md text-center">
-            <CardContent className="pt-6">
-              <CheckCircle className="mx-auto mb-4 h-16 w-16 text-success" />
-              <h2 className="mb-2 text-xl font-semibold">Report Submitted!</h2>
-              <p className="text-muted-foreground">
-                Thank you for helping keep Chicago safe. Redirecting to map...
-              </p>
+          <Card className="w-full max-w-lg text-center animate-in fade-in zoom-in duration-500">
+            <CardContent className="pt-8 pb-6 space-y-6">
+              <div className="animate-in zoom-in duration-700 delay-100">
+                <CheckCircle className="mx-auto h-20 w-20 text-emerald-600" strokeWidth={1.5} />
+              </div>
+              <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
+                <h2 className="text-2xl font-bold text-gray-900">Report Submitted Successfully!</h2>
+                <p className="text-gray-600 leading-relaxed">
+                  Thank you for contributing to community safety. Your report helps fellow travelers make informed decisions.
+                </p>
+              </div>
+
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
+                <p className="text-sm font-medium text-emerald-900 flex items-center justify-center gap-2">
+                  <Info className="h-4 w-4" />
+                  What happens next?
+                </p>
+                <ul className="text-sm text-emerald-700 space-y-1">
+                  <li>✓ Report is under review</li>
+                  <li>✓ Will be visible on the map shortly</li>
+                  <li>✓ Community members will be notified</li>
+                </ul>
+              </div>
+
+              <div className="text-sm text-gray-500 animate-in fade-in duration-700 delay-500">
+                Redirecting to map in {countdown} second{countdown !== 1 ? 's' : ''}...
+              </div>
+
+              <Button
+                onClick={() => navigate('/map')}
+                className="animate-in fade-in slide-in-from-bottom-4 duration-700 delay-400"
+              >
+                View on Map Now
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -125,19 +187,20 @@ const Report: React.FC = () => {
 
   return (
     <Layout>
-      <div className="container py-6 md:py-8">
-        <div className="mb-6">
-          <h1 className="flex items-center gap-2 text-2xl font-bold">
-            <FileText className="h-6 w-6 text-primary" />
+      <div className="container py-6 md:py-8 space-y-6">
+        {/* Header */}
+        <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+          <h1 className="flex items-center gap-2 text-3xl font-bold text-gray-900">
+            <FileText className="h-8 w-8 text-emerald-600" />
             Report an Incident
           </h1>
-          <p className="text-muted-foreground">
-            Help fellow travelers by reporting safety concerns
+          <p className="text-gray-600 mt-2">
+            Help keep Chicago safe by sharing factual safety information with the community
           </p>
         </div>
 
         {!isAuthenticated && (
-          <Alert className="mb-6">
+          <Alert className="animate-in fade-in slide-in-from-top-4 duration-500 delay-75">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               You can submit reports without logging in, but creating an account helps track your contributions.
@@ -145,30 +208,93 @@ const Report: React.FC = () => {
           </Alert>
         )}
 
+        {/* Reporting Guidelines */}
+        <Alert className="bg-blue-50 border-blue-200 animate-in fade-in slide-in-from-top-4 duration-500 delay-100">
+          <Info className="h-5 w-5 text-blue-600" />
+          <AlertTitle className="text-blue-900 font-semibold mb-2">Responsible Reporting Guidelines</AlertTitle>
+          <AlertDescription className="text-blue-800 space-y-2">
+            <ul className="space-y-1.5 text-sm">
+              <li className="flex items-start gap-2">
+                <Shield className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>Be factual and objective - report what you observed</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Shield className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>Avoid sharing personal information about anyone involved</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Shield className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>Focus on safety-relevant details (time, location, incident type)</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Shield className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>Report recent incidents (within 24-48 hours for accuracy)</span>
+              </li>
+            </ul>
+          </AlertDescription>
+        </Alert>
+
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Form */}
-          <Card>
+          <Card className="animate-in fade-in slide-in-from-left-4 duration-500 delay-150">
             <CardHeader>
               <CardTitle>Incident Details</CardTitle>
               <CardDescription>
-                Provide as much detail as possible
+                Provide clear and accurate information
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Severity Selector */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Severity Level *</Label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {(['low', 'medium', 'high'] as SeverityLevel[]).map((severity) => (
+                      <button
+                        key={severity}
+                        type="button"
+                        onClick={() => handleSeverityChange(severity)}
+                        className={cn(
+                          'px-4 py-3 rounded-lg border-2 transition-all duration-200 font-medium text-sm capitalize',
+                          'hover:shadow-md active:scale-95',
+                          formData.severity === severity
+                            ? getSeverityColor(severity) + ' border-current shadow-md'
+                            : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                        )}
+                      >
+                        {severity}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 flex items-start gap-1.5">
+                    <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                    <span>Severity helps users assess risk levels in different areas</span>
+                  </p>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="title">Title *</Label>
                   <Input
                     id="title"
                     name="title"
-                    placeholder="Brief title for the incident"
+                    placeholder="e.g., Suspicious activity near Navy Pier"
                     value={formData.title}
                     onChange={handleInputChange}
-                    className={errors.title ? 'border-destructive' : ''}
+                    maxLength={100}
+                    className={cn(
+                      'transition-all duration-200',
+                      'focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500',
+                      errors.title && 'border-red-500 focus:ring-red-500'
+                    )}
                   />
-                  {errors.title && (
-                    <p className="text-sm text-destructive">{errors.title}</p>
-                  )}
+                  <div className="flex justify-between items-center">
+                    {errors.title ? (
+                      <p className="text-sm text-red-600">{errors.title}</p>
+                    ) : (
+                      <p className="text-xs text-gray-500">Brief, descriptive title</p>
+                    )}
+                    <span className="text-xs text-gray-400">{formData.title.length}/100</span>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -177,8 +303,14 @@ const Report: React.FC = () => {
                     value={formData.category}
                     onValueChange={handleCategoryChange}
                   >
-                    <SelectTrigger className={errors.category ? 'border-destructive' : ''}>
-                      <SelectValue placeholder="Select a category" />
+                    <SelectTrigger
+                      className={cn(
+                        'transition-all duration-200',
+                        'focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500',
+                        errors.category && 'border-red-500'
+                      )}
+                    >
+                      <SelectValue placeholder="Select incident type" />
                     </SelectTrigger>
                     <SelectContent>
                       {INCIDENT_CATEGORIES.map(cat => (
@@ -189,7 +321,7 @@ const Report: React.FC = () => {
                     </SelectContent>
                   </Select>
                   {errors.category && (
-                    <p className="text-sm text-destructive">{errors.category}</p>
+                    <p className="text-sm text-red-600">{errors.category}</p>
                   )}
                 </div>
 
@@ -198,15 +330,25 @@ const Report: React.FC = () => {
                   <Textarea
                     id="description"
                     name="description"
-                    placeholder="Describe what happened and any safety tips..."
-                    rows={4}
+                    placeholder="Describe what happened, when it occurred, and any safety tips for others..."
+                    rows={5}
                     value={formData.description}
                     onChange={handleInputChange}
-                    className={errors.description ? 'border-destructive' : ''}
+                    maxLength={500}
+                    className={cn(
+                      'transition-all duration-200 resize-none',
+                      'focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500',
+                      errors.description && 'border-red-500 focus:ring-red-500'
+                    )}
                   />
-                  {errors.description && (
-                    <p className="text-sm text-destructive">{errors.description}</p>
-                  )}
+                  <div className="flex justify-between items-center">
+                    {errors.description ? (
+                      <p className="text-sm text-red-600">{errors.description}</p>
+                    ) : (
+                      <p className="text-xs text-gray-500">Factual details and context</p>
+                    )}
+                    <span className="text-xs text-gray-400">{formData.description.length}/500</span>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -214,41 +356,20 @@ const Report: React.FC = () => {
                   <Input
                     id="location"
                     name="location"
-                    placeholder="e.g., Millennium Park, Navy Pier"
+                    placeholder="e.g., Millennium Park, Navy Pier, Michigan Avenue"
                     value={formData.location}
                     onChange={handleInputChange}
-                    className={errors.location ? 'border-destructive' : ''}
+                    className={cn(
+                      'transition-all duration-200',
+                      'focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500',
+                      errors.location && 'border-red-500 focus:ring-red-500'
+                    )}
                   />
-                  {errors.location && (
-                    <p className="text-sm text-destructive">{errors.location}</p>
+                  {errors.location ? (
+                    <p className="text-sm text-red-600">{errors.location}</p>
+                  ) : (
+                    <p className="text-xs text-gray-500">Well-known landmark or street name</p>
                   )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="latitude">Latitude</Label>
-                    <Input
-                      id="latitude"
-                      name="latitude"
-                      type="number"
-                      step="any"
-                      value={formData.latitude}
-                      onChange={handleInputChange}
-                      readOnly
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="longitude">Longitude</Label>
-                    <Input
-                      id="longitude"
-                      name="longitude"
-                      type="number"
-                      step="any"
-                      value={formData.longitude}
-                      onChange={handleInputChange}
-                      readOnly
-                    />
-                  </div>
                 </div>
 
                 {errors.submit && (
@@ -260,28 +381,35 @@ const Report: React.FC = () => {
 
                 <Button
                   type="submit"
-                  className="w-full"
+                  className="w-full h-11 text-base font-semibold transition-all duration-200 hover:shadow-lg"
                   disabled={createIncident.isPending}
                 >
-                  {createIncident.isPending ? 'Submitting...' : 'Submit Report'}
+                  {createIncident.isPending ? (
+                    <>
+                      <span className="animate-spin mr-2">⏳</span>
+                      Submitting Report...
+                    </>
+                  ) : (
+                    'Submit Safety Report'
+                  )}
                 </Button>
               </form>
             </CardContent>
           </Card>
 
-          {/* Map for location selection */}
-          <Card>
+          {/* Map */}
+          <Card className="animate-in fade-in slide-in-from-right-4 duration-500 delay-200">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-primary" />
+                <MapPin className="h-5 w-5 text-emerald-600" />
                 Select Location
               </CardTitle>
               <CardDescription>
-                Click on the map to set the incident location
+                Click on the map to pinpoint where the incident occurred
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="h-[400px] overflow-hidden rounded-lg">
+            <CardContent className="space-y-4">
+              <div className="h-[400px] overflow-hidden rounded-lg border border-gray-200">
                 <MapView
                   incidents={[]}
                   clickableMap
@@ -290,9 +418,13 @@ const Report: React.FC = () => {
                   zoom={14}
                 />
               </div>
-              <p className="mt-2 text-sm text-muted-foreground">
-                📍 Selected: {formData.latitude.toFixed(4)}, {formData.longitude.toFixed(4)}
-              </p>
+              <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded-md">
+                <MapPin className="h-4 w-4 text-emerald-600" />
+                <span className="font-medium">Selected:</span>
+                <span className="font-mono text-xs">
+                  {formData.latitude.toFixed(4)}, {formData.longitude.toFixed(4)}
+                </span>
+              </div>
             </CardContent>
           </Card>
         </div>
