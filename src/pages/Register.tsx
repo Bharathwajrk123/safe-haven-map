@@ -7,10 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
   const { register, verifyOTP } = useAuth();
+  const { toast } = useToast();
 
   const [step, setStep] = useState<'form' | 'otp'>('form');
   const [otp, setOtp] = useState('');
@@ -22,42 +24,41 @@ const Register: React.FC = () => {
     confirmPassword: '',
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
   };
 
   const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
     if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
+      toast({ title: "Name Required", description: "Please enter your full name.", variant: "destructive" });
+      return false;
     }
 
     if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
+      toast({ title: "Email Required", description: "Please enter your email.", variant: "destructive" });
+      return false;
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Invalid email format';
+      toast({ title: "Invalid Email", description: "Please enter a valid email address.", variant: "destructive" });
+      return false;
     }
 
     if (!formData.password) {
-      newErrors.password = 'Password is required';
+      toast({ title: "Password Required", description: "Please enter a password.", variant: "destructive" });
+      return false;
     } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+      toast({ title: "Weak Password", description: "Password must be at least 6 characters.", variant: "destructive" });
+      return false;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
+      toast({ title: "Password Mismatch", description: "Passwords do not match.", variant: "destructive" });
+      return false;
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return true;
   };
 
   const passwordChecks = [
@@ -72,7 +73,6 @@ const Register: React.FC = () => {
     if (!validateForm()) return;
 
     setIsLoading(true);
-    setErrors({});
 
     try {
       await register({
@@ -85,9 +85,9 @@ const Register: React.FC = () => {
     } catch (error: any) {
       // Check if message says "User already exists"
       if (error.response?.data?.message === 'User already exists') {
-        setErrors({ submit: 'User already exists with this email.' });
+        toast({ title: "Registration Failed", description: "User already exists with this email.", variant: "destructive" });
       } else {
-        setErrors({ submit: 'Registration failed. Please try again.' });
+        toast({ title: "Registration Failed", description: "Please try again later.", variant: "destructive" });
       }
     } finally {
       setIsLoading(false);
@@ -97,17 +97,16 @@ const Register: React.FC = () => {
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otp || otp.length < 6) {
-      setErrors({ otp: 'Please enter a valid 6-digit OTP' });
+      toast({ title: "Invalid OTP", description: "Please enter a valid 6-digit OTP.", variant: "destructive" });
       return;
     }
 
     setIsLoading(true);
-    setErrors({});
     try {
       await verifyOTP(formData.email, otp);
       navigate('/');
     } catch (error) {
-      setErrors({ otp: 'Invalid or expired OTP.' });
+      toast({ title: "Verification Failed", description: "Invalid or expired OTP.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -144,9 +143,8 @@ const Register: React.FC = () => {
                   placeholder="John Doe"
                   value={formData.name}
                   onChange={handleInputChange}
-                  className={errors.name ? 'border-destructive' : ''}
+                // className={errors.name ? 'border-destructive' : ''}
                 />
-                {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
               </div>
 
               <div className="space-y-2">
@@ -158,9 +156,8 @@ const Register: React.FC = () => {
                   placeholder="tourist@example.com"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={errors.email ? 'border-destructive' : ''}
+                // className={errors.email ? 'border-destructive' : ''}
                 />
-                {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
               </div>
 
               <div className="space-y-2">
@@ -173,7 +170,7 @@ const Register: React.FC = () => {
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={handleInputChange}
-                    className={errors.password ? 'border-destructive pr-10' : 'pr-10'}
+                    className='pr-10'
                   />
                   <Button
                     type="button"
@@ -196,7 +193,6 @@ const Register: React.FC = () => {
                     ))}
                   </div>
                 )}
-                {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
               </div>
 
               <div className="space-y-2">
@@ -208,17 +204,11 @@ const Register: React.FC = () => {
                   placeholder="••••••••"
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
-                  className={errors.confirmPassword ? 'border-destructive' : ''}
+                // className={errors.confirmPassword ? 'border-destructive' : ''}
                 />
-                {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword}</p>}
               </div>
 
-              {errors.submit && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{errors.submit}</AlertDescription>
-                </Alert>
-              )}
+
 
               <Button type="submit" className="w-full gap-2" disabled={isLoading}>
                 <UserPlus className="h-4 w-4" />
@@ -236,10 +226,9 @@ const Register: React.FC = () => {
                   placeholder="123456"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value)}
-                  className={errors.otp ? 'border-destructive text-center text-2xl tracking-widest' : 'text-center text-2xl tracking-widest'}
+                  className='text-center text-2xl tracking-widest'
                   maxLength={6}
                 />
-                {errors.otp && <p className="text-sm text-destructive text-center">{errors.otp}</p>}
               </div>
 
               <Button type="submit" className="w-full" disabled={isLoading}>

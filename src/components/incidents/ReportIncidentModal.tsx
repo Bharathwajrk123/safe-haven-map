@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useToast } from '@/hooks/use-toast';
 import { Loader2, AlertTriangle, MapPin } from 'lucide-react';
 import {
     Dialog,
@@ -42,7 +43,8 @@ const ReportIncidentModal: React.FC<ReportIncidentModalProps> = ({
     location,
 }) => {
     const { mutate: createIncident, isPending } = useCreateIncident();
-    const [error, setError] = useState<string | null>(null);
+    const { toast } = useToast(); // Added useToast initialization
+    // const [error, setError] = useState<string | null>(null); // Removed local error state
 
     const {
         register,
@@ -63,7 +65,11 @@ const ReportIncidentModal: React.FC<ReportIncidentModalProps> = ({
 
     const onSubmit = (data: ReportFormData) => {
         if (!location) {
-            setError('No location selected');
+            toast({
+                title: "Location Missing",
+                description: "No location selected.",
+                variant: 'destructive',
+            });
             return;
         }
 
@@ -78,12 +84,31 @@ const ReportIncidentModal: React.FC<ReportIncidentModalProps> = ({
                 onSuccess: () => {
                     reset();
                     onClose();
+                    toast({
+                        title: "Incident Reported",
+                        description: "Your report has been submitted successfully.",
+                    });
                 },
                 onError: () => {
-                    setError('Failed to submit report. Please try again.');
+                    toast({
+                        title: "Submission Failed",
+                        description: "Failed to submit report. Please try again.",
+                        variant: 'destructive',
+                    });
                 },
             }
         );
+    };
+
+    const onError = (errors: any) => {
+        const firstErrorKey = Object.keys(errors)[0];
+        if (firstErrorKey) {
+            toast({
+                title: "Validation Error",
+                description: errors[firstErrorKey].message,
+                variant: 'destructive',
+            });
+        }
     };
 
     return (
@@ -106,19 +131,18 @@ const ReportIncidentModal: React.FC<ReportIncidentModalProps> = ({
                     </div>
                 )}
 
-                {error && <div className="text-sm text-destructive">{error}</div>}
+                {/* error && <div className="text-sm text-destructive">{error}</div> removed */}
 
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
+                <form onSubmit={handleSubmit(onSubmit, onError)} className="space-y-4 py-4">
                     <div className="space-y-2">
                         <Label htmlFor="title">Title</Label>
                         <Input
                             id="title"
                             placeholder="Brief title of incident"
                             {...register('title', { required: 'Title is required' })}
+                            className={errors.title ? 'border-destructive' : ''}
                         />
-                        {errors.title && (
-                            <p className="text-xs text-destructive">{errors.title.message}</p>
-                        )}
+                        {/* Removed inline error */}
                     </div>
 
                     <div className="space-y-2">
@@ -163,12 +187,9 @@ const ReportIncidentModal: React.FC<ReportIncidentModalProps> = ({
                             id="description"
                             placeholder="Describe what happened..."
                             {...register('description', { required: 'Description is required' })}
+                            className={errors.description ? 'border-destructive' : ''}
                         />
-                        {errors.description && (
-                            <p className="text-xs text-destructive">
-                                {errors.description.message}
-                            </p>
-                        )}
+                        {/* Removed inline error */}
                     </div>
 
                     <DialogFooter>
